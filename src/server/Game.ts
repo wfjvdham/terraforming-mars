@@ -999,7 +999,6 @@ export class Game implements IGame, Logger {
   }
 
   public playerIsFinishedWithResearchPhase(player: IPlayer): void {
-  // ...existing code...
     this.deferredActions.runAllFor(player, () => {
       this.researchedPlayers.add(player.id);
       if (this.researchedPlayers.size === this.players.length) {
