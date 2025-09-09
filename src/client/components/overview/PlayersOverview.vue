@@ -1,5 +1,13 @@
 <template>
         <div class="players-overview" v-if="hasPlayers()">
+            <div class="player-order-block">
+                <h3>Turn Order (Next Generation)</h3>
+                <ol>
+                  <li v-for="(player, idx) in getPlayersInPassingOrder()" :key="player.color">
+                    <span :class="'color-square ' + player.color">{{ player.name }}</span>
+                  </li>
+                </ol>
+            </div>
             <overview-settings />
             <div class="other_player" v-if="thisPlayer === undefined || players.length > 1">
                 <div v-for="(otherPlayer, index) in getPlayersInOrder()" :key="otherPlayer.color">
@@ -73,6 +81,17 @@ export default Vue.extend({
     return {};
   },
   methods: {
+    getPlayersInPassingOrder(): Array<PublicPlayerModel> {
+      // Show players in the order they passed
+      const passedColors = this.playerView.game.passedPlayers;
+      if (!passedColors || passedColors.length === 0) {
+        return [];
+      }
+      // Map colors to player objects
+      return passedColors
+        .map((color: Color) => this.players.find((p) => p.color === color))
+        .filter((p): p is PublicPlayerModel => !!p);
+    },
     hasPlayers(): boolean {
       return this.players.length > 0;
     },
