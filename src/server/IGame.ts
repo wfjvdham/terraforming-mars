@@ -55,6 +55,7 @@ export interface IGame extends Logger {
   generation: number;
   readonly players: ReadonlyArray<IPlayer>;
   readonly playersInGenerationOrder: ReadonlyArray<IPlayer>;
+  passOrder: Array<PlayerId>;
 
   /**
    * Stores the state of each global parameter at the end of each generation.
@@ -177,6 +178,7 @@ export interface IGame extends Logger {
   getTemperature(): number;
   getGeneration(): number;
   getPassedPlayers():ReadonlyArray<Color>;
+  getNextGenerationOrder(): ReadonlyArray<{id: PlayerId, color: Color, name: string}>;
   /**
    * Add `tile` to `space` for `player`. Triggers all effects that come with placing a tile.
    *

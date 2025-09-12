@@ -128,6 +128,8 @@ export class Game implements IGame, Logger {
   private donePlayers = new Set<PlayerId>();
   private passedPlayers = new Set<PlayerId>();
   private researchedPlayers = new Set<PlayerId>();
+  /** The order in which players passed this generation, used to determine next generation turn order */
+  public passOrder: Array<PlayerId> = [];
   /** The first player of this generation. */
   public first: IPlayer;
 
@@ -468,6 +470,7 @@ export class Game implements IGame, Logger {
       milestones: this.milestones.map(toName),
       moonData: MoonData.serialize(this.moonData),
       oxygenLevel: this.oxygenLevel,
+      passOrder: this.passOrder,
       passedPlayers: Array.from(this.passedPlayers),
       pathfindersData: PathfindersData.serialize(this.pathfindersData),
       phase: this.phase,
@@ -672,7 +675,45 @@ export class Game implements IGame, Logger {
         return;
       }
     }
-    this.incrementFirstPlayer();
+    this.setFirstPlayerFromPassOrder();
+  }
+
+  private setFirstPlayerFromPassOrder(): void {
+    // If we have a pass order from last generation, use it to determine next first player
+    if (this.passOrder.length > 0) {
+      const firstPassedPlayerId = this.passOrder[0];
+      const firstPassedPlayer = this.getPlayerById(firstPassedPlayerId);
+      this.setFirstPlayer(firstPassedPlayer);
+      // Set the full turn order based on pass order
+      this.setTurnOrderFromPassOrder();
+    } else {
+      // Fallback to default rotation if no pass order exists
+      this.incrementFirstPlayer();
+    }
+  }
+
+  private setTurnOrderFromPassOrder(): void {
+    if (this.passOrder.length === 0) {
+      return;
+    }
+    
+    // Create the new turn order based on pass order
+    const newOrder: Array<IPlayer> = [];
+    
+    // Add players in the order they passed
+    for (const playerId of this.passOrder) {
+      const player = this.getPlayerById(playerId);
+      newOrder.push(player);
+    }
+    
+    // Add any players who didn't pass (shouldn't happen in normal gameplay)
+    for (const player of this.players) {
+      if (!this.passOrder.includes(player.id)) {
+        newOrder.push(player);
+      }
+    }
+    
+    this.playersInGenerationOrder = newOrder;
   }
 
   // Public for testing.
@@ -740,6 +781,7 @@ export class Game implements IGame, Logger {
   private gotoProductionPhase(): void {
     this.phase = Phase.PRODUCTION;
     this.passedPlayers.clear();
+    // Note: We keep passOrder until the next generation starts to use it for turn order
     this.someoneHasRemovedOtherPlayersPlants = false;
     this.players.forEach((player) => {
       player.colonies.cardDiscount = 0; // Iapetus reset hook
@@ -981,6 +1023,10 @@ export class Game implements IGame, Logger {
 
   public playerHasPassed(player: IPlayer): void {
     this.passedPlayers.add(player.id);
+    // Track the order in which players pass for next generation turn order
+    if (!this.passOrder.includes(player.id)) {
+      this.passOrder.push(player.id);
+    }
   }
 
   public hasResearched(player: IPlayer): boolean {
@@ -994,6 +1040,8 @@ export class Game implements IGame, Logger {
         this.researchedPlayers.clear();
         this.phase = Phase.ACTION;
         this.passedPlayers.clear();
+        // Clear pass order from previous generation when starting new action phase
+        this.passOrder = [];
         this.potentiallyChangeFirstPlayer();
 
         this.startActionsForPlayer(this.first);
@@ -1281,6 +1329,48 @@ export class Game implements IGame, Logger {
       passedPlayersColors.push(this.getPlayerById(player).color);
     });
     return passedPlayersColors;
+  }
+
+  /**
+   * Returns the expected turn order for the next generation based on pass order
+   * from the current generation
+   */
+  public getNextGenerationOrder(): Array<{id: PlayerId, color: Color, name: string}> {
+    const nextGenOrder: Array<{id: PlayerId, color: Color, name: string}> = [];
+    
+    // If we have a pass order, use it to determine next generation order
+    if (this.passOrder.length > 0) {
+      for (const playerId of this.passOrder) {
+        const player = this.getPlayerById(playerId);
+        nextGenOrder.push({
+          id: player.id,
+          color: player.color,
+          name: player.name
+        });
+      }
+      
+      // Add any players who haven't passed yet (shouldn't happen in normal gameplay)
+      for (const player of this.players) {
+        if (!this.passOrder.includes(player.id)) {
+          nextGenOrder.push({
+            id: player.id,
+            color: player.color,
+            name: player.name
+          });
+        }
+      }
+    } else {
+      // If no pass order yet, show current generation order
+      for (const player of this.playersInGenerationOrder) {
+        nextGenOrder.push({
+          id: player.id,
+          color: player.color,
+          name: player.name
+        });
+      }
+    }
+    
+    return nextGenOrder;
   }
 
   // addTile applies to the Mars board, but not the Moon board, see MoonExpansion.addTile for placing
@@ -1716,6 +1806,7 @@ export class Game implements IGame, Logger {
     game.passedPlayers = new Set<PlayerId>(d.passedPlayers);
     game.donePlayers = new Set<PlayerId>(d.donePlayers);
     game.researchedPlayers = new Set<PlayerId>(d.researchedPlayers);
+    game.passOrder = d.passOrder || [];
 
     game.lastSaveId = d.lastSaveId;
     game.clonedGamedId = d.clonedGamedId;

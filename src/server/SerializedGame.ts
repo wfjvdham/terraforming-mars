@@ -52,6 +52,7 @@ export type SerializedGame = {
     nomadSpace: SpaceId | undefined;
     pathfindersData: SerializedPathfindersData | undefined;
     oxygenLevel: number;
+    passOrder: Array<PlayerId>;
     passedPlayers: Array<PlayerId>;
     phase: Phase;
     players: Array<SerializedPlayer>;

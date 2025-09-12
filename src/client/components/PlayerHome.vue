@@ -216,6 +216,16 @@
         </div>
       </div>
 
+      <div class="player_home_block player_home_block--turnorder nofloat" v-if="playerView.players.length>1 && game.nextGenerationOrder.length > 0">
+        <dynamic-title title="Next generation order" :color="thisPlayer.color"/>
+        <div class="player_item" v-for="(p, idx) in game.nextGenerationOrder" :key="p.id" v-trim-whitespace>
+          <div class="player_name_cont" :class="getPlayerCssForNextGenOrder(p, true)">
+            <span class="player_number">{{ idx+1 }}.</span><span class="player_name" :class="getPlayerCssForNextGenOrder(p, false)" href="#">{{ p.name }}</span>
+          </div>
+          <div class="player_separator" v-if="idx !== game.nextGenerationOrder.length - 1">⟶</div>
+        </div>
+      </div>
+
       <details class="accordion board-accordion" open>
         <summary class="accordion-header">
           <div class="is-action">
@@ -291,6 +301,7 @@ import {Phase} from '@/common/Phase';
 import {GameModel} from '@/common/models/GameModel';
 import {PlayerViewModel, PublicPlayerModel} from '@/common/models/PlayerModel';
 import {CardType} from '@/common/cards/CardType';
+import {Color} from '@/common/Color';
 import {nextTileView, TileView} from './board/TileView';
 import {getCardsByType, isCardActivated} from '@/client/utils/CardUtils';
 import {sortActiveCards} from '@/client/utils/ActiveCardsSortingOrder';
@@ -423,6 +434,16 @@ export default Vue.extend({
         if (player.needsToDraft || (player.needsToDraft === undefined && player.isActive)) {
           classes.push('player_is_active');
         }
+        classes.push(playerColorClass(player.color, 'bg'));
+      }
+      return classes.join(' ');
+    },
+    getPlayerCssForNextGenOrder: (
+      player: {id: string, color: Color, name: string},
+      highlightActive: boolean,
+    ): string => {
+      const classes = ['highlighter_box'];
+      if (highlightActive) {
         classes.push(playerColorClass(player.color, 'bg'));
       }
       return classes.join(' ');
