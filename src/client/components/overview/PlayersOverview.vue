@@ -95,6 +95,9 @@ export default Vue.extend({
         return player!;
       }).filter(p => p !== undefined);
     },
+    getPlayerByColor(color: Color): PublicPlayerModel | undefined {
+      return this.players.find(p => p.color === color);
+    },
     getIsFirstForGen(player: PublicPlayerModel): boolean {
       return playerIndex(player.color, this.players) === 0;
     },

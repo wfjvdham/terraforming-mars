@@ -136,8 +136,6 @@ export interface IGame extends Logger {
   allAwardsFunded(): boolean;
   allMilestonesClaimed(): boolean;
   hasPassedThisActionPhase(player: IPlayer): boolean;
-  // Public for testing.
-  incrementFirstPlayer(): void;
   // Only used in the prelude The New Space Race
   overrideFirstPlayer(newFirstPlayer: IPlayer): void;
   // The first player this generation

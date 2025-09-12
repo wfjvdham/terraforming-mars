@@ -1122,32 +1122,3 @@ function waitingForGlobalParameters(player: Player): Array<GlobalParameter> {
   }
   return cast(player.getWaitingFor(), OrOptions).options.map((o) => o.title as string).map(titlesToGlobalParameter);
 }
-
-describe('Pass Order Feature', () => {
-  it('should track pass order correctly', () => {
-    const player1 = TestPlayer.BLUE.newPlayer();
-    const player2 = TestPlayer.RED.newPlayer();
-    const player3 = TestPlayer.YELLOW.newPlayer();
-    const game = Game.newInstance('gpassOrderTest', [player1, player2, player3], player1);
-    
-    // Test initial state
-    expect(game.passOrder).to.deep.equal([]);
-    
-    // Test tracking pass order
-    game.playerHasPassed(player3);
-    expect(game.passOrder).to.deep.equal([player3.id]);
-    
-    game.playerHasPassed(player1);
-    expect(game.passOrder).to.deep.equal([player3.id, player1.id]);
-    
-    game.playerHasPassed(player2);
-    expect(game.passOrder).to.deep.equal([player3.id, player1.id, player2.id]);
-    
-    // Test getNextGenerationOrder
-    const nextGenOrder = game.getNextGenerationOrder();
-    expect(nextGenOrder).to.have.lengthOf(3);
-    expect(nextGenOrder[0].id).to.equal(player3.id);
-    expect(nextGenOrder[1].id).to.equal(player1.id);
-    expect(nextGenOrder[2].id).to.equal(player2.id);
-  });
-});

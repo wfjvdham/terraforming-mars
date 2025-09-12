@@ -235,9 +235,11 @@ export class Game implements IGame, Logger {
   private setFirstPlayer(first: IPlayer) {
     this.log('First player this generation is ${0}', (b) => b.player(first));
     this.first = first;
-    const e = [...this.players, ...this.players];
-    const idx = e.findIndex((p) => p.id === this.first.id);
-    this.playersInGenerationOrder = e.slice(idx, idx + this.players.length);
+    if (this.playersInGenerationOrder.length == 0) {
+      const e = [...this.players, ...this.players];
+      const idx = e.findIndex((p) => p.id === this.first.id);
+      this.playersInGenerationOrder = e.slice(idx, idx + this.players.length);
+    }
   }
 
   public static newInstance(id: GameId,
@@ -679,24 +681,13 @@ export class Game implements IGame, Logger {
   }
 
   private setFirstPlayerFromPassOrder(): void {
-    // If we have a pass order from last generation, use it to determine next first player
-    if (this.passOrder.length > 0) {
-      const firstPassedPlayerId = this.passOrder[0];
-      const firstPassedPlayer = this.getPlayerById(firstPassedPlayerId);
-      this.setFirstPlayer(firstPassedPlayer);
-      // Set the full turn order based on pass order
-      this.setTurnOrderFromPassOrder();
-    } else {
-      // Fallback to default rotation if no pass order exists
-      this.incrementFirstPlayer();
-    }
+    const firstPassedPlayerId = this.passOrder[0];
+    const firstPassedPlayer = this.getPlayerById(firstPassedPlayerId);
+    this.setFirstPlayer(firstPassedPlayer);
+    this.setTurnOrderFromPassOrder();
   }
 
-  private setTurnOrderFromPassOrder(): void {
-    if (this.passOrder.length === 0) {
-      return;
-    }
-    
+  private setTurnOrderFromPassOrder(): void {  
     // Create the new turn order based on pass order
     const newOrder: Array<IPlayer> = [];
     
@@ -706,25 +697,7 @@ export class Game implements IGame, Logger {
       newOrder.push(player);
     }
     
-    // Add any players who didn't pass (shouldn't happen in normal gameplay)
-    for (const player of this.players) {
-      if (!this.passOrder.includes(player.id)) {
-        newOrder.push(player);
-      }
-    }
-    
     this.playersInGenerationOrder = newOrder;
-  }
-
-  // Public for testing.
-  public incrementFirstPlayer(): void {
-    let firstIndex = this.players.map(toID).indexOf(this.first.id);
-    if (firstIndex === -1) {
-      throw new Error('Didn\'t find player');
-    }
-    firstIndex = (firstIndex + 1) % this.players.length;
-    const first = this.players[firstIndex];
-    this.setFirstPlayer(first);
   }
 
   // Only used in the prelude The New Space Race and card Space Wargames.
@@ -894,6 +867,8 @@ export class Game implements IGame, Logger {
     this.generation++;
     this.log('Generation ${0}', (b) => b.forNewGeneration().number(this.generation));
     this.setNextFirstPlayer();
+    // Clear pass order after setting turn order for new generation
+    this.passOrder = [];
 
     this.players.forEach((player) => {
       player.hasIncreasedTerraformRatingThisGeneration = false;
@@ -1040,8 +1015,8 @@ export class Game implements IGame, Logger {
         this.researchedPlayers.clear();
         this.phase = Phase.ACTION;
         this.passedPlayers.clear();
-        // Clear pass order from previous generation when starting new action phase
-        this.passOrder = [];
+        // Note: Keep passOrder until next generation starts - don't clear it here
+        // It may be needed if setFirstPlayer() gets called again
         this.potentiallyChangeFirstPlayer();
 
         this.startActionsForPlayer(this.first);
@@ -1050,24 +1025,24 @@ export class Game implements IGame, Logger {
   }
 
   public getPlayerBefore(player: IPlayer): IPlayer {
-    const playerIndex = this.players.indexOf(player);
+    const playerIndex = this.playersInGenerationOrder.indexOf(player);
     if (playerIndex === -1) {
       throw new Error(`Player ${player.id} not in game ${this.id}`);
     }
 
     // Go to the end of the array if stand at the start
-    return this.players[(playerIndex === 0) ? this.players.length - 1 : playerIndex - 1];
+    return this.playersInGenerationOrder[(playerIndex === 0) ? this.playersInGenerationOrder.length - 1 : playerIndex - 1];
   }
 
   public getPlayerAfter(player: IPlayer): IPlayer {
-    const playerIndex = this.players.indexOf(player);
+    const playerIndex = this.playersInGenerationOrder.indexOf(player);
 
     if (playerIndex === -1) {
       throw new Error(`Player ${player.id} not in game ${this.id}`);
     }
 
     // Go to the beginning of the array if we reached the end
-    return this.players[(playerIndex + 1 >= this.players.length) ? 0 : playerIndex + 1];
+    return this.playersInGenerationOrder[(playerIndex + 1 >= this.playersInGenerationOrder.length) ? 0 : playerIndex + 1];
   }
 
   public playerIsFinishedTakingActions(): void {
