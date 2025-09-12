@@ -126,7 +126,8 @@ export class Game implements IGame, Logger {
   public activePlayer: IPlayer;
   /** Players that are done with the game after final greenery placement. */
   private donePlayers = new Set<PlayerId>();
-  private passedPlayers: PlayerId[] = [];
+  private passedPlayers = new Set<PlayerId>();
+  private passedPlayersOrder: Array<PlayerId> = [];
   private researchedPlayers = new Set<PlayerId>();
   /** The first player of this generation. */
   public first: IPlayer;
@@ -231,7 +232,9 @@ export class Game implements IGame, Logger {
   }
 
   private setFirstPlayer(first: IPlayer) {
+    this.log('First player this generation is ${0}', (b) => b.player(first));
     this.first = first;
+    this.playersInGenerationOrder = this.passedPlayersOrder.map((playerId) => this.getPlayerById(playerId));
   }
 
   public static newInstance(id: GameId,
@@ -464,7 +467,8 @@ export class Game implements IGame, Logger {
       milestones: this.milestones.map(toName),
       moonData: MoonData.serialize(this.moonData),
       oxygenLevel: this.oxygenLevel,
-      passedPlayers: Array.from(this.passedPlayers),
+      passedPlayers: this.passedPlayers,
+      passedPlayersOrder: Array.from(this.passedPlayersOrder),
       pathfindersData: PathfindersData.serialize(this.pathfindersData),
       phase: this.phase,
       players: this.players.map((p) => p.serialize()),
@@ -655,7 +659,7 @@ export class Game implements IGame, Logger {
   }
 
   public hasPassedThisActionPhase(player: IPlayer): boolean {
-    return this.passedPlayers.includes(player.id);
+    return this.passedPlayers.has(player.id);
   }
 
   private setNextFirstPlayer() {
@@ -735,13 +739,9 @@ export class Game implements IGame, Logger {
 
   private gotoProductionPhase(): void {
     this.phase = Phase.PRODUCTION;
-    // If all players have passed, set next generation order before resetting passedPlayers
-    if (this.passedPlayers.length === this.players.length) {
-      const newOrder = this.passedPlayers.map((id) => this.getPlayerById(id));
-      this.playersInGenerationOrder = newOrder;
-      this.setFirstPlayer(newOrder[0]);
-    }
-    this.passedPlayers = [];
+    this.passedPlayers.clear();
+    this.playersInGenerationOrder = this.passedPlayersOrder.map((playerId) => this.getPlayerById(playerId));
+    this.passedPlayersOrder = [];
     this.someoneHasRemovedOtherPlayersPlants = false;
     this.players.forEach((player) => {
       player.colonies.cardDiscount = 0; // Iapetus reset hook
@@ -982,9 +982,8 @@ export class Game implements IGame, Logger {
   }
 
   public playerHasPassed(player: IPlayer): void {
-    if (!this.passedPlayers.includes(player.id)) {
-      this.passedPlayers.push(player.id);
-    }
+    this.passedPlayers.add(player.id);
+    this.passedPlayersOrder.push(player.id);
   }
 
   public hasResearched(player: IPlayer): boolean {
@@ -997,31 +996,30 @@ export class Game implements IGame, Logger {
       if (this.researchedPlayers.size === this.players.length) {
         this.researchedPlayers.clear();
         this.phase = Phase.ACTION;
-        this.passedPlayers = [];
-        this.potentiallyChangeFirstPlayer();  
+        this.passedPlayers.clear();
+        this.passedPlayersOrder = [];
+        this.potentiallyChangeFirstPlayer();
         this.startActionsForPlayer(this.first);
       }
     });
   }
 
   public getPlayerBefore(player: IPlayer): IPlayer {
-    const arr = this.playersInGenerationOrder && this.playersInGenerationOrder.length > 0 ? this.playersInGenerationOrder : this.players;
-    const playerIndex = arr.indexOf(player);
+    const playerIndex = this.playersInGenerationOrder.indexOf(player);
     if (playerIndex === -1) {
       throw new Error(`Player ${player.id} not in game ${this.id}`);
     }
     // Go to the end of the array if stand at the start
-    return arr[(playerIndex === 0) ? arr.length - 1 : playerIndex - 1];
+    return this.playersInGenerationOrder[(playerIndex === 0) ? this.playersInGenerationOrder.length - 1 : playerIndex - 1];
   }
 
   public getPlayerAfter(player: IPlayer): IPlayer {
-    const arr = this.playersInGenerationOrder && this.playersInGenerationOrder.length > 0 ? this.playersInGenerationOrder : this.players;
-    const playerIndex = arr.indexOf(player);
+    const playerIndex = this.playersInGenerationOrder.indexOf(player);
     if (playerIndex === -1) {
       throw new Error(`Player ${player.id} not in game ${this.id}`);
     }
     // Go to the beginning of the array if we reached the end
-    return arr[(playerIndex + 1 >= arr.length) ? 0 : playerIndex + 1];
+    return this.playersInGenerationOrder[(playerIndex + 1 >= this.playersInGenerationOrder.length) ? 0 : playerIndex + 1];
   }
 
   public playerIsFinishedTakingActions(): void {
@@ -1715,7 +1713,8 @@ export class Game implements IGame, Logger {
     if (d.underworldData !== undefined) {
       game.underworldData = d.underworldData;
     }
-    game.passedPlayers = Array.isArray(d.passedPlayers) ? d.passedPlayers : [];
+    game.passedPlayers = new Set<PlayerId>(d.passedPlayers);
+    game.passedPlayersOrder = d.passedPlayersOrder;
     game.donePlayers = new Set<PlayerId>(d.donePlayers);
     game.researchedPlayers = new Set<PlayerId>(d.researchedPlayers);
 
